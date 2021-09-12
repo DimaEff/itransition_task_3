@@ -4,8 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-
-namespace RockPaperScissors
+namespace ConsoleApp1
 {
     internal class Helper
     {
@@ -14,23 +13,77 @@ namespace RockPaperScissors
             return BitConverter.ToString(bytes).Replace("-", string.Empty).ToLower();
         }
     }
-    
+
     internal class ConsoleTable
     {
     }
 
     internal class Rules
     {
-        private string[] moves;
-        
+        private static string[] _moves;
+
         public Rules(string[] moves)
         {
-            this.moves = moves;
+            _moves = moves;
         }
 
-        public bool CheckIsPersonWinner(string personMove, int computerMove)
+        public int StartPersonMove()
         {
-            
+            while (true)
+            {
+                PrintMoves();
+                var personMove = SelectMove();
+
+                if (personMove == 0)
+                {
+                    ShowRulesInfo();
+                }
+
+                var personMoveIndex = personMove - 1;
+                if (personMoveIndex < _moves.Length && personMoveIndex >= 0)
+                {
+                    return personMoveIndex;
+                }
+            }
+        }
+
+        public bool CheckIsPersonWinner(int personMove, int computerMove)
+        {
+            var movesCont = _moves.Length;
+            var fromPersToComp = (movesCont + computerMove - personMove) % movesCont;
+            var fromCompToPers = (movesCont + personMove - computerMove) % movesCont;
+
+            return fromPersToComp > fromCompToPers;
+        }
+
+        private static void PrintMoves()
+        {
+            for (var i = 0; i < _moves.Length; i++)
+            {
+                Console.WriteLine($"  {i + 1} {_moves[i]}");
+            }
+
+            Console.WriteLine("");
+            Console.WriteLine("  0 help");
+        }
+
+        private static int SelectMove()
+        {
+            int personMove;
+
+            do
+            {
+                Console.WriteLine("Select a move");
+            } while (!int.TryParse(Console.ReadLine(), out personMove));
+
+            return personMove;
+        }
+
+        private static void ShowRulesInfo()
+        {
+            Console.WriteLine("rules help!!!!");
+            Console.WriteLine("Press enter to continue");
+            Console.ReadLine();
         }
     }
 
@@ -57,9 +110,9 @@ namespace RockPaperScissors
 
         private static byte[] GenSalt(int length)
         {
-            RNGCryptoServiceProvider crypto = new RNGCryptoServiceProvider();
+            RNGCryptoServiceProvider rngCsp  = new RNGCryptoServiceProvider();
             var salt = new byte[length];
-            crypto.GetBytes(salt);
+            rngCsp .GetBytes(salt);
             return salt;
         }
 
@@ -67,7 +120,8 @@ namespace RockPaperScissors
         {
             var hmac = new HMACSHA256(salt);
             var bstr = Encoding.UTF8.GetBytes(str);
-            return hmac.ComputeHash(bstr);;
+            return hmac.ComputeHash(bstr);
+            ;
         }
     }
 
@@ -85,14 +139,30 @@ namespace RockPaperScissors
             }
         }
 
-        private static void StartGame(IList<string> moves)
+        private static void StartGame(string[] moves)
         {
-            var hmac = new HMACHash(moves[0]);
-            var hmachash = hmac.GetHMAC();
-            var hmacSalt = hmac.GetSalt();
+            var rules = new Rules(moves);
 
-            Console.WriteLine($"HMAC: {hmachash}");
-            Console.WriteLine($"HMAC key: {hmacSalt}");
+            // var hmac = new HMACHash(moves[0]);
+            // var hmachash = hmac.GetHMAC();
+            // var hmacSalt = hmac.GetSalt();
+            //
+            // Console.WriteLine($"HMAC: {hmachash}");
+            // Console.WriteLine($"HMAC key: {hmacSalt}");
+
+            // var pm = 5;
+            // var cm = 0;
+            // var isWin = rules.CheckIsPersonWinner(pm, cm);
+            // Console.WriteLine(isWin);
+
+            // var personMoveIndex = rules.StartPersonMove();
+            // Console.WriteLine(personMoveIndex);
+            
+            RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
+            byte[] randomByte = new byte[1];
+            rngCsp.GetBytes(randomByte);
+            var randomNum = randomByte[0] % 5;
+            Console.WriteLine(randomNum);
         }
 
         private static void PrintMessageOfWrong()
@@ -114,7 +184,7 @@ namespace RockPaperScissors
         private static bool CheckMoves(ICollection<string> moves)
         {
             var isOddNumberMoreOne = moves.Count > 1 && moves.Count % 2 == 1;
-            var isRepeat = moves.Distinct().Count() != moves.Count();
+            var isRepeat = moves.Distinct().Count() != moves.Count;
 
             return isOddNumberMoreOne && !isRepeat;
         }
