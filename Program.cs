@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using ConsoleTableExt;
 
-namespace ConsoleApp1
+
+namespace RockPaperScissors
 {
     internal class Helper
     {
@@ -16,44 +18,143 @@ namespace ConsoleApp1
 
     internal class ConsoleTable
     {
+        private static List<List<object>> _tableData;
+
+        public ConsoleTable(string[] moves)
+        {
+            _tableData = new List<List<object>>();
+            AddFirstRow(moves);
+            AddRowsFromSecond(moves);
+        }
+
+        public void PrintTable()
+        {
+            ConsoleTableBuilder
+                .From(_tableData)
+                .WithFormat(ConsoleTableBuilderFormat.Alternative)
+                .ExportAndWriteLine();
+        }
+
+        private static void AddFirstRow(string[] moves)
+        {
+            var firstRow = new List<object> {"Person↓ | Computer→"};
+            foreach (var move in moves)
+            {
+                firstRow.Add(move);
+            }
+
+            _tableData.Add(firstRow);
+        }
+
+        private static void AddRowsFromSecond(string[] moves)
+        {
+            for (int i = 0; i < moves.Length; i++)
+            {
+                var row = new List<object> {$"{moves[i]}"};
+                for (var n = 0; n < moves.Length; n++)
+                {
+                    var winnerIndex = Rules.GetWinnerIndex(i, n, moves.Length);
+                    row.Add($"{Rules.GetPersonGameResult(i, n, winnerIndex)}");
+                }
+
+                _tableData.Add(row);
+            }
+        }
     }
 
     internal class Rules
     {
         private static string[] _moves;
+        private static int _personMove;
+        private static int _computerMove;
+        private static int _winnerIndex;
 
         public Rules(string[] moves)
         {
             _moves = moves;
         }
 
-        public int StartPersonMove()
+        public int GetComputerMove()
+        {
+            return _computerMove;
+        }
+
+        public int GetPersonMove()
+        {
+            return _personMove;
+        }
+
+        public void DoComputerMove()
+        {
+            RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
+            byte[] randomByte = new byte[1];
+            rngCsp.GetBytes(randomByte);
+            var randomNum = randomByte[0] % _moves.Length;
+
+            _computerMove = randomNum;
+        }
+
+        public void DoPersonMove()
         {
             while (true)
             {
                 PrintMoves();
-                var personMove = SelectMove();
+                var personSelectedMove = SelectPersonMove();
 
-                if (personMove == 0)
+                if (personSelectedMove == 0)
                 {
                     ShowRulesInfo();
                 }
 
-                var personMoveIndex = personMove - 1;
+                var personMoveIndex = personSelectedMove - 1;
                 if (personMoveIndex < _moves.Length && personMoveIndex >= 0)
                 {
-                    return personMoveIndex;
+                    _personMove = personMoveIndex;
+                    break;
                 }
             }
         }
 
-        public bool CheckIsPersonWinner(int personMove, int computerMove)
+        public void CheckWinner()
         {
-            var movesCont = _moves.Length;
-            var fromPersToComp = (movesCont + computerMove - personMove) % movesCont;
-            var fromCompToPers = (movesCont + personMove - computerMove) % movesCont;
+            _winnerIndex = GetWinnerIndex(_personMove, _computerMove, _moves.Length);
+        }
 
-            return fromPersToComp > fromCompToPers;
+        public static int GetWinnerIndex(int personMove, int computerMove, int movesLength)
+        {
+            var fromPersToComp = (movesLength + computerMove - personMove) % movesLength;
+            var fromCompToPers = (movesLength + personMove - computerMove) % movesLength;
+
+            return fromPersToComp > fromCompToPers ? personMove : computerMove;
+        }
+
+        public void PrintSelectedMoves()
+        {
+            Console.WriteLine($"Computer`s move: {_moves[_computerMove]}");
+            Console.WriteLine($"Your move: {_moves[_personMove]}");
+        }
+
+        public static string GetPersonGameResult(int personMove, int computerMove, int winnerIndex)
+        {
+            if (personMove == computerMove)
+            {
+                return "draw";
+            }
+
+            return personMove == winnerIndex ? "win" : "lose";
+        }
+        
+        public void PrintWinner()
+        {
+            var result = GetPersonGameResult(_personMove, _computerMove, _winnerIndex);
+            if (result == "draw")
+            {
+                Console.WriteLine("Draw!");
+            }
+            else
+            {
+                Console.WriteLine($"You {result}!");
+            }
         }
 
         private static void PrintMoves()
@@ -67,7 +168,7 @@ namespace ConsoleApp1
             Console.WriteLine("  0 help");
         }
 
-        private static int SelectMove()
+        private static int SelectPersonMove()
         {
             int personMove;
 
@@ -76,12 +177,14 @@ namespace ConsoleApp1
                 Console.WriteLine("Select a move");
             } while (!int.TryParse(Console.ReadLine(), out personMove));
 
+            _personMove = personMove;
             return personMove;
         }
 
         private static void ShowRulesInfo()
         {
-            Console.WriteLine("rules help!!!!");
+            var table = new ConsoleTable(_moves);
+            table.PrintTable();
             Console.WriteLine("Press enter to continue");
             Console.ReadLine();
         }
@@ -110,9 +213,9 @@ namespace ConsoleApp1
 
         private static byte[] GenSalt(int length)
         {
-            RNGCryptoServiceProvider rngCsp  = new RNGCryptoServiceProvider();
+            RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
             var salt = new byte[length];
-            rngCsp .GetBytes(salt);
+            rngCsp.GetBytes(salt);
             return salt;
         }
 
@@ -143,26 +246,20 @@ namespace ConsoleApp1
         {
             var rules = new Rules(moves);
 
-            // var hmac = new HMACHash(moves[0]);
-            // var hmachash = hmac.GetHMAC();
-            // var hmacSalt = hmac.GetSalt();
-            //
-            // Console.WriteLine($"HMAC: {hmachash}");
-            // Console.WriteLine($"HMAC key: {hmacSalt}");
-
-            // var pm = 5;
-            // var cm = 0;
-            // var isWin = rules.CheckIsPersonWinner(pm, cm);
-            // Console.WriteLine(isWin);
-
-            // var personMoveIndex = rules.StartPersonMove();
-            // Console.WriteLine(personMoveIndex);
+            rules.DoComputerMove();
+            var computerMove = rules.GetComputerMove();
+            var hmac = new HMACHash(moves[computerMove]);
+            var hmachash = hmac.GetHMAC();
+            var salt = hmac.GetSalt();
+            Console.WriteLine($"HMAC(hex): {hmachash}");
             
-            RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
-            byte[] randomByte = new byte[1];
-            rngCsp.GetBytes(randomByte);
-            var randomNum = randomByte[0] % 5;
-            Console.WriteLine(randomNum);
+            rules.DoPersonMove();
+
+            rules.CheckWinner();
+            rules.PrintSelectedMoves();
+            rules.PrintWinner();
+
+            Console.WriteLine($"HMAC key: {salt}");
         }
 
         private static void PrintMessageOfWrong()
